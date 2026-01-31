@@ -16,6 +16,6 @@ const upload = multer({
   },
 });
 
-router.post("/upload", upload.single("resume"), uploadResume);
+router.post("/upload/:jobId", upload.single("resume"), uploadResume);
 
 export default router;

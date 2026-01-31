@@ -4,6 +4,7 @@ import cors from "cors";
 
 // Routes
 import jobRoutes from "./routes/job.routes.js";
+import candidateRoutes from "./routes/candidate.routes.js";
 import resumeRoutes from "./routes/resume.routes.js";
 import twilioRoutes from "./routes/twilio.routes.js";
 import preScreenRoute from "./routes/preScreening.routes.js";
@@ -33,6 +34,7 @@ app.get("/", (req, res) => {
  * API ROUTES
  */
 app.use("/api/job", jobRoutes);
+app.use("/api/candidate", candidateRoutes);
 app.use("/api/prescreen", preScreenRoute);
 app.use("/api/resume", resumeRoutes);
 app.use("/twilio", twilioRoutes);

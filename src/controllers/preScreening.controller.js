@@ -26,7 +26,7 @@ export const preScreener = async (req, res) => {
 
     res.json({
       success: true,
-      jobId: savedData.jobId,
+      jobId: savedData._id,
       data: savedData,
     });
   } catch (error) {

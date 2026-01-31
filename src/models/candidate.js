@@ -47,6 +47,7 @@ const candidateSchema = new mongoose.Schema({
   experience: Number,
   skills: [String],
   matchScore: Number,
+  screeningStatus: String,
   callSid: String,
 
   job: {
@@ -59,7 +60,7 @@ const candidateSchema = new mongoose.Schema({
 
   evaluation: Object,
 
-  status: {
+  callStatus: {
     type: String,
     enum: ["pending", "in_progress", "completed"],
     default: "pending",

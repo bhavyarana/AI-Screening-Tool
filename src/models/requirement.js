@@ -10,7 +10,7 @@ const requirementSchema = new mongoose.Schema(
     clientRequirement: String,
     jobRole: String,
     skills: [String],
-    experience: Number,
+    experience: String,
     jobDescription: String,
     screeningQuestions: [String],
     linkedinPost: String,
