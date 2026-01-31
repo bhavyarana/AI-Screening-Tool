@@ -1,0 +1,68 @@
+# ========================
+# OS junk
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Logs
+# ========================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ========================
+# Environment variables
+# ========================
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# ========================
+# Node / Express
+# ========================
+node_modules/
+npm-cache/
+.eslintcache
+
+# ========================
+# Build outputs
+# ========================
+dist/
+build/
+out/
+
+# ========================
+# React
+# ========================
+client/build/
+client/node_modules/
+
+# ========================
+# Server
+# ========================
+server/node_modules/
+
+# ========================
+# Testing
+# ========================
+coverage/
+
+# ========================
+# Editor / IDE
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========================
+# Misc
+# ========================
+*.tmp
+*.temp
+*.bak
