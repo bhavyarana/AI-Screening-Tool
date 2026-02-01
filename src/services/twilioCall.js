@@ -1,7 +1,11 @@
-import client from "../config/twilio.js";
+// import client from "../config/twilio.js";
+import twilio from "twilio";
 import Candidate from "../models/candidate.js";
 
 const startScreeningCall = async (phone, candidateId) => {
+  const accountSid = process.env.TWILIO_SID;
+  const authToken = process.env.TWILIO_AUTH;
+  const client = twilio(accountSid, authToken);
   const call = await client.calls.create({
     to: phone,
     from: process.env.TWILIO_NUMBER,

@@ -4,6 +4,7 @@ import scoreResume from "../services/resumeScoring.js";
 import extractResume from "../services/resumeExtract.js";
 import Candidate from "../models/candidate.js";
 import Requirement from "../models/requirement.js";
+import { normalizeIndianPhone } from "../utils/phoneNormalizer.js";
 
 export const uploadResume = async (req, res, next) => {
   try {
@@ -23,10 +24,13 @@ export const uploadResume = async (req, res, next) => {
     const match = await extractResume(text);
     const resumeScore = await scoreResume(match, jd);
 
+    // Handle no match case
     if (!match) throw new Error("AI did not return any data");
 
+    // Extract score
     const score = Number(resumeScore) || 0;
 
+    // Determine screening status
     const getStatus = (score) => {
       if (score < 50) return "REJECT";
       if (score <= 80) return "REVIEW";
@@ -34,10 +38,13 @@ export const uploadResume = async (req, res, next) => {
     };
     const screeningStatus = getStatus(score);
 
+    // Normalize phone
+    const normalizedPhone = normalizeIndianPhone(match.phone);
+
     // 3️⃣ Create candidate (schema-aligned)
     const candidate = await Candidate.create({
       name: match.name || "",
-      phone: match.phone || "",
+      phone: normalizedPhone || "",
       email: match.email || "",
       experience: match.experience || 0,
       skills: match.skills || [],

@@ -103,7 +103,15 @@
 
 // export default router;
 import { Router } from "express";
-import { getAllJobs, getSingleJob } from "../controllers/job.controller.js";
+import {
+  getAllJobs,
+  getSingleJob,
+  getJobInfo,
+  updateJobInfo,
+  deleteJob,
+  addScreeningQuestion,
+  removeScreeningQuestion,
+} from "../controllers/job.controller.js";
 import { getCandidatesByJob } from "../controllers/candidate.controller.js";
 
 const router = Router();
@@ -114,7 +122,22 @@ router.get("/", getAllJobs);
 // Job details page
 router.get("/:jobId", getSingleJob);
 
+// Job info for editing
+router.get("/:jobId/info", getJobInfo);
+
+// Update job info
+router.put("/:jobId", updateJobInfo);
+
 // Job → candidates list (NEW)
 router.get("/:jobId/candidates", getCandidatesByJob);
+
+// DELETE job
+router.delete("/:jobId", deleteJob);
+
+// Add screening question
+router.post("/:jobId/question", addScreeningQuestion);
+
+// DELETE screening question
+router.delete("/:jobId/question/:index", removeScreeningQuestion);
 
 export default router;
