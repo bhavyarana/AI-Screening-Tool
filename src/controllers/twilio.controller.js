@@ -1,9 +1,31 @@
-// import { questions } from "../data/questions.js";
 import Candidate from "../models/candidate.js";
 import evaluateTranscript from "../services/aiEvaluation.js";
 import startScreeningCall from "../services/twilioCall.js";
+const BASE_URL = process.env.PUBLIC_BASE_URL;
 
-// ====================  Initiate Call ====================
+/* =========================
+   Helpers (CRITICAL)
+========================= */
+
+function sendTwiML(res, xml) {
+  res.type("text/xml");
+  res.send(xml);
+}
+
+const sendTwiMLError = (res, message) => {
+  sendTwiML(res, `<Say voice="alice">${message}</Say><Hangup/>`);
+};
+
+const sanitizeForTwilio = (text = "") =>
+  text
+    .replace(/[^\x00-\x7F]/g, "") // remove smart quotes & unicode
+    .replace(/[*_`]/g, "") // remove markdown
+    .replace(/\s+/g, " ") // normalize spaces
+    .trim();
+
+/* =========================
+   Initiate Call
+========================= */
 
 export const initiateScreeningCall = async (req, res) => {
   try {
@@ -21,152 +43,181 @@ export const initiateScreeningCall = async (req, res) => {
     if (candidate.callStatus !== "pending") {
       return res
         .status(400)
-        .json({ error: "Call already in progress or completed" });
+        .json({ error: "Call already started or completed" });
     }
 
-    // 🔔 THIS is the key line
     await startScreeningCall(candidate.phone, candidate._id);
 
-    res.json({
-      success: true,
-      message: "Screening call initiated",
-    });
+    res.json({ success: true });
   } catch (err) {
     console.error("CALL INIT ERROR:", err);
     res.status(500).json({ error: "Failed to initiate call" });
   }
 };
 
-// ==================== 1. ASK QUESTION ====================
+/* =========================
+   Twilio Voice Webhook
+========================= */
 
 export const handleVoice = async (req, res) => {
-  const index = Number(req.query.q || 0);
-  const candidateId = req.query.cid;
+  try {
+    const index = Number(req.query.q || 0);
+    const candidateId = req.query.cid;
+    const BASE_URL = process.env.PUBLIC_BASE_URL;
 
-  // 1️⃣ Fetch candidate + job
-  const candidate = await Candidate.findById(candidateId).populate(
-    "job",
-    "screeningQuestions",
-  );
+    const candidate = await Candidate.findById(candidateId).populate(
+      "job",
+      "screeningQuestions",
+    );
 
-  if (!candidate || !candidate.job) {
-    return res.sendStatus(404);
-  }
+    if (!candidate || !candidate.job) {
+      return sendTwiML(
+        res,
+        `
+        <Response>
+          <Say voice="alice">Interview details not found.</Say>
+          <Hangup/>
+        </Response>
+      `,
+      );
+    }
 
-  const questions = candidate.job.screeningQuestions || [];
+    const questions = candidate.job.screeningQuestions || [];
 
-  // 2️⃣ End call if questions finished
-  if (index >= questions.length) {
-    const response = `
+    if (index >= questions.length) {
+      return sendTwiML(
+        res,
+        `
+        <Response>
+          <Say voice="alice">Thank you. The screening is complete.</Say>
+          <Hangup/>
+        </Response>
+      `,
+      );
+    }
+
+    const question = sanitizeForTwilio(questions[index]);
+
+    const actionUrl = `${BASE_URL}/twilio/voice?q=${index + 1}&amp;cid=${candidateId}`;
+
+    const recordingCallback = `${BASE_URL}/twilio/recording?q=${index}&amp;cid=${candidateId}`;
+
+    return sendTwiML(
+      res,
+      `
+<Response>
+  <Say voice="alice">${question}</Say>
+  <Pause length="1"/>
+  <Record
+    maxLength="5"
+    timeout="2"
+    playBeep="true"
+    method="POST"
+    action="${actionUrl}"
+    recordingStatusCallback="${recordingCallback}"
+    recordingStatusCallbackMethod="POST"
+  />
+</Response>
+`,
+    );
+  } catch (err) {
+    console.error("VOICE ERROR:", err);
+    return sendTwiML(
+      res,
+      `
       <Response>
-        <Pause length="1"/>
-        <Say voice="alice">Thank you. The screening is complete.</Say>
+        <Say voice="alice">An internal error occurred.</Say>
         <Hangup/>
       </Response>
-    `;
-    res.type("text/xml");
-    return res.send(response);
+    `,
+    );
   }
-
-  // 3️⃣ Ask next question
-  const response = `
-    <Response>
-      <Say voice="alice">${questions[index]}</Say>
-      <Record 
-        maxLength="30"
-        timeOut="5"
-        action="/twilio/voice?q=${index + 1}&cid=${candidateId}"
-        recordingStatusCallback="/twilio/recording?q=${index}&cid=${candidateId}"
-        transcribe="true"
-        transcribeCallback="/twilio/transcription?q=${index}&cid=${candidateId}"
-      />
-    </Response>
-  `;
-
-  res.type("text/xml");
-  res.send(response);
 };
 
-// ==================== 2. RECORDING FINISHED ====================
+/* =========================
+   Recording Callback
+========================= */
 
 export const handleRecording = async (req, res) => {
-  const recordingUrl = req.body.RecordingUrl;
-  const callSid = req.body.CallSid;
-  const candidateId = req.query.cid;
-  const questionIndex = Number(req.query.q);
+  try {
+    const { CallSid } = req.body;
+    const candidateId = req.query.cid;
 
-  console.log("Recording URL:", recordingUrl);
+    if (candidateId && CallSid) {
+      await Candidate.findByIdAndUpdate(candidateId, {
+        callSid: CallSid,
+      });
+    }
 
-  // Ensure candidate has callSid stored
-  await Candidate.findByIdAndUpdate(candidateId, {
-    callSid,
-  });
-
-  res.sendStatus(200);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("RECORDING ERROR:", err);
+    res.sendStatus(200);
+  }
 };
 
-// ==================== 3. TRANSCRIPTION RECEIVED ====================
+/* =========================
+   Transcription Callback
+========================= */
 
 export const handleTranscription = async (req, res) => {
-  const transcriptText = req.body.TranscriptionText;
-  const callSid = req.body.CallSid;
-  const candidateId = req.query.cid;
-  const questionIndex = Number(req.query.q);
+  try {
+    const text = req.body.TranscriptionText;
+    const candidateId = req.query.cid;
+    const questionIndex = Number(req.query.q);
 
-  if (!transcriptText) return res.sendStatus(200);
+    if (!text || !candidateId) return res.sendStatus(200);
 
-  await Candidate.findByIdAndUpdate(candidateId, {
-    $push: {
-      transcripts: {
-        questionIndex,
-        text: transcriptText,
+    await Candidate.findByIdAndUpdate(candidateId, {
+      $push: {
+        transcripts: { questionIndex, text },
       },
-    },
-  });
+    });
 
-  res.sendStatus(200);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("TRANSCRIPTION ERROR:", err);
+    res.sendStatus(200);
+  }
 };
 
-// ==================== 4. CALL STATUS CALLBACK ====================
+/* =========================
+   Call Completed
+========================= */
 
 export const handleStatus = async (req, res) => {
-  const callSid = req.body.CallSid;
-  const callStatus = req.body.CallStatus;
-
-  if (callStatus !== "completed") {
-    return res.sendStatus(200);
-  }
-
-  const candidate = await Candidate.findOne({ callSid }).populate(
-    "job",
-    "screeningQuestions",
-  );
-
-  if (!candidate || !candidate.transcripts?.length) {
-    return res.sendStatus(200);
-  }
-
-  const questions = candidate.job.screeningQuestions || [];
-
-  const orderedAnswers = candidate.transcripts
-    .sort((a, b) => a.questionIndex - b.questionIndex)
-    .map((t) => {
-      const q = questions[t.questionIndex] || `Question ${t.questionIndex + 1}`;
-      return `Q: ${q}\nA: ${t.text}`;
-    })
-    .join("\n\n");
-
   try {
-    const evaluation = await evaluateTranscript(orderedAnswers);
+    const { CallSid, CallStatus } = req.body;
+    if (CallStatus !== "completed") return res.sendStatus(200);
+
+    const candidate = await Candidate.findOne({ callSid: CallSid }).populate(
+      "job",
+      "screeningQuestions",
+    );
+
+    if (!candidate || !candidate.transcripts?.length) {
+      return res.sendStatus(200);
+    }
+
+    const questions = candidate.job.screeningQuestions || [];
+
+    const transcript = candidate.transcripts
+      .sort((a, b) => a.questionIndex - b.questionIndex)
+      .map((t) => {
+        const q = questions[t.questionIndex] || "Question";
+        return `Q: ${q}\nA: ${t.text}`;
+      })
+      .join("\n\n");
+
+    const evaluation = await evaluateTranscript(transcript);
 
     candidate.evaluation = evaluation;
     candidate.callStatus = "completed";
     await candidate.save();
 
-    console.log("Screening completed for candidate:", candidate._id);
+    res.sendStatus(200);
   } catch (err) {
-    console.error("Evaluation failed:", err);
+    console.error("STATUS ERROR:", err);
+    res.sendStatus(200);
   }
-
-  res.sendStatus(200);
 };
