@@ -26,11 +26,12 @@ const startScreeningCall = async (phone, candidateId) => {
     url: `${PUBLIC_BASE_URL}/twilio/voice?cid=${candidateId}&q=0`,
     statusCallback: `${PUBLIC_BASE_URL}/twilio/status`,
     statusCallbackEvent: ["completed"],
+    method: "POST",
   });
 
   await Candidate.findByIdAndUpdate(candidateId, {
     callSid: call.sid,
-    transcripts: [],
+    answers: [], // ✅ reset answers
     callStatus: "pending",
   });
 

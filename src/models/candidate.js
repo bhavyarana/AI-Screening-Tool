@@ -1,70 +1,136 @@
-// import mongoose from "mongoose";
-
-// const candidateSchema = new mongoose.Schema({
-//   name: String,
-//   email: String,
-//   phone: String,
-//   experience: Number,
-//   skills: [String],
-//   matchScore: Number,
-//   status: String,
-//  job: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: "Job",
-//     required: true,
-//   },
-
-//   // callSid: String,
-//   // transcript: {
-//   //   type: String,
-//   //   default: "",
-//   // },
-//   // evaluation: {
-//   //   summary: String,
-//   //   strengths: [String],
-//   //   risks: [String],
-//   //   communicationScore: Number,
-//   //   technicalScore: Number,
-//   //   hireRecommendation: String,
-//   //   reasoning: String,
-//   // },
-
-// });
-
-// export default mongoose.model("Candidate", candidateSchema);
-
 import mongoose from "mongoose";
 
-const transcriptSchema = new mongoose.Schema({
-  questionIndex: Number,
-  text: String,
-});
+const answerSchema = new mongoose.Schema(
+  {
+    questionIndex: {
+      type: Number,
+      required: true,
+    },
 
-const candidateSchema = new mongoose.Schema({
-  name: String,
-  phone: String,
-  email: String,
-  experience: Number,
-  skills: [String],
-  matchScore: Number,
-  screeningStatus: String,
-  callSid: String,
+    question: {
+      type: String,
+      required: true,
+    },
 
-  job: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Requirement",
-    required: true,
+    recordingSid: {
+      type: String,
+      required: true,
+    },
+
+    recordingUrl: {
+      type: String,
+      required: true,
+    },
+
+    /**
+     * Transcribed text from Deepgram
+     * Can be null if STT fails
+     */
+    answerText: {
+      type: String,
+      default: null,
+    },
+
+    /**
+     * Recording duration in seconds
+     */
+    duration: {
+      type: Number,
+      default: 0,
+    },
   },
+  { _id: false },
+);
 
-  transcripts: [transcriptSchema],
+const candidateSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+    },
 
-  evaluation: Object,
+    phone: {
+      type: String,
+      required: true,
+      index: true,
+    },
 
-  callStatus: {
-    type: String,
-    enum: ["pending", "in_progress", "completed"],
-    default: "pending",
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+
+    experience: {
+      type: Number,
+      default: 0,
+    },
+
+    skills: {
+      type: [String],
+      default: [],
+    },
+
+    matchScore: {
+      type: Number,
+      default: 0,
+    },
+
+    callSid: {
+      type: String,
+      index: true,
+    },
+
+    job: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Requirement",
+      required: true,
+      index: true,
+    },
+
+    callStatus: {
+      type: String,
+      enum: ["pending", "in_progress", "completed"],
+      default: "pending",
+      index: true,
+    },
+
+    /**
+     * One entry per question (Twilio creates multiple recordings)
+     */
+    answers: {
+      type: [answerSchema],
+      default: [],
+    },
+
+    /**
+     * Final AI evaluation result
+     * Stored as structured JSON from OpenAI
+     */
+    evaluation: {
+      summary: String,
+      strengths: [String],
+      weaknesses: [String],
+      communicationScore: Number,
+      technicalScore: Number,
+      hireRecommendation: {
+        type: String,
+        enum: ["YES", "NO", "MAYBE"],
+      },
+      reasoning: String,
+    },
   },
-});
+  {
+    timestamps: true, // createdAt, updatedAt
+  },
+);
+
+/**
+ * Prevent duplicate answers for same question
+ */
+candidateSchema.index(
+  { _id: 1, "answers.questionIndex": 1 },
+  { unique: false },
+);
 
 export default mongoose.model("Candidate", candidateSchema);
