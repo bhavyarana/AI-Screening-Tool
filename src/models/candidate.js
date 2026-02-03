@@ -76,6 +76,12 @@ const candidateSchema = new mongoose.Schema(
       default: 0,
     },
 
+    screeningStatus: {
+      type: String,
+      enum: ["REJECT", "REVIEW", "AUTO_PASS"],
+      default: "REVIEW",
+    },
+
     callSid: {
       type: String,
       index: true,
