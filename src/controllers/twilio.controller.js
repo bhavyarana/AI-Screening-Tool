@@ -99,6 +99,8 @@ export const handleVoice = async (req, res) => {
   <Pause length="1"/>
   <Record
     maxLength="5"
+    speechTimeout="3"
+    trimSilence="true"
     playBeep="true"
     action="${BASE_URL}/twilio/voice?q=${index + 1}&amp;cid=${candidateId}"
     recordingStatusCallback="${BASE_URL}/twilio/recording?q=${index}&amp;cid=${candidateId}"
